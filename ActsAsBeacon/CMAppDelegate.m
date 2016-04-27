@@ -46,16 +46,9 @@ NSString *const PREFS_KEY_POWER = @"power";
 
     // Insert code here to initialize your application
     self.manager = [[CBPeripheralManager alloc] initWithDelegate:self queue:nil];
-//    
-//    [self.uuidFieldCell setStringValue:@""];
-//    [self.majorFieldCell setStringValue:@"5"];
-//    [self.minorFieldCell setStringValue:@"1000"];
-//    [self.powerFieldCell setStringValue:@"-58"];
     
     self.isBroadcasting = NO;
     [self.statusField setStringValue:@"Not broadcasting"];
-    
-
     
 }
 
