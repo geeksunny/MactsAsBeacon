@@ -26,16 +26,31 @@
 
 @end
 
+NSString *const PREFS_KEY_UUID = @"uuid";
+NSString *const PREFS_KEY_MAJOR = @"major";
+NSString *const PREFS_KEY_MINOR = @"minor";
+NSString *const PREFS_KEY_POWER = @"power";
+
 @implementation CMAppDelegate
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
+
+    prefrences = [NSUserDefaults standardUserDefaults];
+    NSDictionary *defaults = [NSDictionary dictionaryWithObjectsAndKeys:
+                              @"B0702880-A295-A8AB-F734-031A98A512DE", PREFS_KEY_UUID,
+                              @"5", PREFS_KEY_MAJOR,
+                              @"1000", PREFS_KEY_MINOR,
+                              @"-58", PREFS_KEY_POWER,
+                              nil];
+    [prefrences registerDefaults:defaults];
+
     // Insert code here to initialize your application
     self.manager = [[CBPeripheralManager alloc] initWithDelegate:self queue:nil];
-    
-    [self.uuidFieldCell setStringValue:@"B0702880-A295-A8AB-F734-031A98A512DE"];
-    [self.majorFieldCell setStringValue:@"5"];
-    [self.minorFieldCell setStringValue:@"1000"];
-    [self.powerFieldCell setStringValue:@"-58"];
+//    
+//    [self.uuidFieldCell setStringValue:@""];
+//    [self.majorFieldCell setStringValue:@"5"];
+//    [self.minorFieldCell setStringValue:@"1000"];
+//    [self.powerFieldCell setStringValue:@"-58"];
     
     self.isBroadcasting = NO;
     [self.statusField setStringValue:@"Not broadcasting"];
@@ -44,7 +59,11 @@
     
 }
 
--(void)peripheralManagerDidUpdateState:(CBPeripheralManager *)peripheral {
+//- (void)applicationWillTerminate:(NSNotification *)notification {
+//    [prefrences synchronize];
+//}
+
+- (void)peripheralManagerDidUpdateState:(CBPeripheralManager *)peripheral {
     
     if (peripheral.state == CBPeripheralManagerStatePoweredOn) {
         
@@ -57,7 +76,7 @@
     }
 }
 
--(IBAction)didTapToggleButton:(id)sender {
+- (IBAction)didTapToggleButton:(id)sender {
     
     if (self.manager && !self.isBroadcasting) {
     
