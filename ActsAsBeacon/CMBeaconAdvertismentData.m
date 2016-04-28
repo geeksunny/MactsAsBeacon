@@ -5,16 +5,18 @@
 //  Created by Tim on 11/11/2013.
 //  Copyright (c) 2013 Charismatic Megafauna Ltd. All rights reserved.
 //
+//  Forked by Justin on 4/26/2016
+//
 
 #import "CMBeaconAdvertismentData.h"
 
 @implementation CMBeaconAdvertismentData
 
-- (id)initWithProximityUUID:(NSUUID *)proximityUUID major:(uint16_t)major minor:(uint16_t)minor measuredPower:(int8_t)power {
+- (id)initWithProximityUUID:(NSString *)uuid major:(uint16_t)major minor:(uint16_t)minor measuredPower:(int8_t)power {
     self = [super init];
     
     if (self) {
-        self.proximityUUID = proximityUUID;
+        self.proximityUUID = [[NSUUID alloc] initWithUUIDString:uuid];
         self.major = major;
         self.minor = minor;
         self.measuredPower = power;

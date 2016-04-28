@@ -5,10 +5,11 @@
 //  Created by Tim on 11/11/2013.
 //  Copyright (c) 2013 Charismatic Megafauna Ltd. All rights reserved.
 //
+//  Forked by Justin on 4/26/2016
+//
 
 #import "CMAppDelegate.h"
 #import <IOBluetooth/IOBluetooth.h>
-#import "CMBeaconAdvertismentData.h"
 
 @interface CMAppDelegate () <CBPeripheralManagerDelegate>
 @property (nonatomic, strong) CBPeripheralManager *manager;
@@ -72,18 +73,14 @@ NSString *const PREFS_KEY_POWER = @"power";
 - (IBAction)didTapToggleButton:(id)sender {
     
     if (self.manager && !self.isBroadcasting) {
-    
-        NSUUID *proxUUID = [[NSUUID alloc] initWithUUIDString:self.uuidFieldCell.stringValue];
-        NSInteger major = [self.majorFieldCell.stringValue integerValue];
-        NSInteger minor = [self.minorFieldCell.stringValue integerValue];
-        NSInteger power = [self.powerFieldCell.stringValue integerValue];
+        NSArray<CMBeaconAdvertismentData *> *beacons = [self createBeaconArray];
         
-        CMBeaconAdvertismentData *beaconData = [[CMBeaconAdvertismentData alloc] initWithProximityUUID:proxUUID
-                                                                                                 major:major
-                                                                                                 minor:minor
-                                                                                         measuredPower:power];
-        
-        [self.manager startAdvertising:beaconData.beaconAdvertisement];
+        for (int i = 0; i < [beacons count]; i++) {
+            // TODO: This only advertises the last beaconAdvertisement fed in to it.
+            //       Look in to a queue system.
+            CMBeaconAdvertismentData *beacon = [beacons objectAtIndex:i];
+            [self.manager startAdvertising:beacon.beaconAdvertisement];
+        }
         self.isBroadcasting = YES;
         
         [self.statusField setStringValue:@"Broadcasting"];
@@ -117,6 +114,67 @@ NSString *const PREFS_KEY_POWER = @"power";
 
     }
     
+}
+
+- (NSArray<CMBeaconAdvertismentData *> *)createBeaconArray {
+    NSMutableArray<CMBeaconAdvertismentData *> *beaconArray = [[NSMutableArray alloc] init];
+
+    NSArray<NSString *> *uuids = [self.uuidFieldCell.stringValue componentsSeparatedByString:@","];
+    NSArray<NSString *> *majors = [self.majorFieldCell.stringValue componentsSeparatedByString:@","];
+    NSArray<NSString *> *minors = [self.minorFieldCell.stringValue componentsSeparatedByString:@","];
+    NSArray<NSString *> *powers = [self.powerFieldCell.stringValue componentsSeparatedByString:@","];
+
+    int numOfBeacons = [self largestValue:[NSArray arrayWithObjects:
+                                           [NSNumber numberWithUnsignedInteger:[uuids count]],
+                                           [NSNumber numberWithUnsignedInteger:[majors count]],
+                                           [NSNumber numberWithUnsignedInteger:[minors count]],
+                                           [NSNumber numberWithUnsignedInteger:[powers count]],
+                                           nil]];
+
+    for (int i = 0; i < numOfBeacons; i++) {
+        NSString *uuid, *major, *minor, *power;
+        // uuid
+        if (i < (int)[uuids count]) {
+            uuid = [uuids objectAtIndex:i];
+        } else {
+            uuid = [uuids objectAtIndex:[uuids count]-1];
+        }
+        // major
+        if (i < (int)[majors count]) {
+            major = [majors objectAtIndex:i];
+        } else {
+            major = [majors objectAtIndex:[majors count]-1];
+        }
+        // minor
+        if (i < (int)[minors count]) {
+            minor = [minors objectAtIndex:i];
+        } else {
+            minor = [minors objectAtIndex:[minors count]-1];
+        }
+        // power
+        if (i < (int)[powers count]) {
+            power = [powers objectAtIndex:i];
+        } else {
+            power = [powers objectAtIndex:[powers count]-1];
+        }
+        // beacon record
+        CMBeaconAdvertismentData *beacon = [[CMBeaconAdvertismentData alloc] initWithProximityUUID:uuid major:[major integerValue] minor:[minor integerValue] measuredPower:[power integerValue]];
+        [beaconArray addObject:beacon];
+    }
+
+    return beaconArray;
+}
+
+- (int)largestValue:(NSArray<NSNumber *> *)values {
+    int highestValue = -INFINITY;
+
+    for (int i = 0; i < [values count]; i++) {
+        if ((int)[values objectAtIndex:i] > highestValue) {
+            highestValue = (int)[values objectAtIndex:i];
+        }
+    }
+
+    return highestValue;
 }
 
 @end
