@@ -10,6 +10,8 @@
 
 #import "CMBeaconAdvertismentData.h"
 
+NSString *const BEACON_KEY = @"kCBAdvDataAppleBeaconKey";
+
 @implementation CMBeaconAdvertismentData
 
 - (id)initWithProximityUUID:(NSString *)uuid major:(uint16_t)major minor:(uint16_t)minor measuredPower:(int8_t)power {
@@ -26,8 +28,6 @@
 }
 
 - (NSDictionary *)beaconAdvertisement {
-    NSString *beaconKey = @"kCBAdvDataAppleBeaconKey";
-    
     unsigned char advertisementBytes[21] = {0};
     
     [self.proximityUUID getUUIDBytes:(unsigned char *)&advertisementBytes];
@@ -42,7 +42,7 @@
     
     NSMutableData *advertisement = [NSMutableData dataWithBytes:advertisementBytes length:21];
     
-    return [NSDictionary dictionaryWithObject:advertisement forKey:beaconKey];
+    return [NSDictionary dictionaryWithObject:advertisement forKey:BEACON_KEY];
 }
 
 @end

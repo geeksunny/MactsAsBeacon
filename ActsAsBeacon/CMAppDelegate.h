@@ -13,19 +13,9 @@
 
 @interface CMAppDelegate : NSObject <NSApplicationDelegate> {
     NSUserDefaults *prefrences;
+    int currentBeacon;
 }
 
-extern NSString *const PREFS_KEY_UUID;
-extern NSString *const PREFS_KEY_MAJOR;
-extern NSString *const PREFS_KEY_MINOR;
-extern NSString *const PREFS_KEY_POWER;
-
 @property (assign) IBOutlet NSWindow *window;
-
-- (NSArray<CMBeaconAdvertismentData *> *)createBeaconArray;
-
-- (int)largestValue:(NSArray<NSNumber *> *)values;
-
-
 
 @end

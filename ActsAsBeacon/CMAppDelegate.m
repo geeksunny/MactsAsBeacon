@@ -23,6 +23,8 @@
 @property (nonatomic, weak) IBOutlet NSTextField *statusField;
 @property (nonatomic, weak) IBOutlet NSButton *toggleButton;
 
+@property (strong, nonatomic) NSMutableArray<CMBeaconAdvertismentData *> *beacons;
+
 @property (nonatomic) BOOL isBroadcasting;
 
 @end
@@ -32,24 +34,36 @@ NSString *const PREFS_KEY_MAJOR = @"major";
 NSString *const PREFS_KEY_MINOR = @"minor";
 NSString *const PREFS_KEY_POWER = @"power";
 
+NSString *const DEFAULT_UUID = @"AB73D3E4-CC88-4364-91F3-F3A0ABE96641";
+NSString *const DEFAULT_MAJOR = @"2";
+NSString *const DEFAULT_MINOR = @"68,91,212";
+NSString *const DEFAULT_POWER = @"-58";
+
+NSString *const STRING_BEACONS_ACTIVE = @"Broadcasting";
+NSString *const STRING_BEACONS_INACTIVE = @"Not broadcasting";
+NSString *const STRING_BUTTON_START = @"Start braodcasting";
+NSString *const STRING_BUTTON_STOP = @"Stop broadcasting";
+
 @implementation CMAppDelegate
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
+    self.beacons = [[NSMutableArray alloc] init];
 
     prefrences = [NSUserDefaults standardUserDefaults];
     NSDictionary *defaults = [NSDictionary dictionaryWithObjectsAndKeys:
-                              @"B0702880-A295-A8AB-F734-031A98A512DE", PREFS_KEY_UUID,
-                              @"5", PREFS_KEY_MAJOR,
-                              @"1000", PREFS_KEY_MINOR,
-                              @"-58", PREFS_KEY_POWER,
+                              DEFAULT_UUID, PREFS_KEY_UUID,
+                              DEFAULT_MAJOR, PREFS_KEY_MAJOR,
+                              DEFAULT_MINOR, PREFS_KEY_MINOR,
+                              DEFAULT_POWER, PREFS_KEY_POWER,
                               nil];
     [prefrences registerDefaults:defaults];
 
-    // Insert code here to initialize your application
+    currentBeacon = 0;
+
     self.manager = [[CBPeripheralManager alloc] initWithDelegate:self queue:nil];
     
     self.isBroadcasting = NO;
-    [self.statusField setStringValue:@"Not broadcasting"];
+    [self.statusField setStringValue:STRING_BEACONS_INACTIVE];
     
 }
 
@@ -57,34 +71,53 @@ NSString *const PREFS_KEY_POWER = @"power";
 //    [prefrences synchronize];
 //}
 
-- (void)peripheralManagerDidUpdateState:(CBPeripheralManager *)peripheral {
-    
-    if (peripheral.state == CBPeripheralManagerStatePoweredOn) {
-        
-        self.manager = peripheral;
-        
-//        NSUUID *proximityUUID = [[NSUUID alloc] initWithUUIDString:@"B0702880-A295-A8AB-F734-031A98A512DE"];
-//        CMBeaconAdvertismentData *beaconData = [[CMBeaconAdvertismentData alloc] initWithProximityUUID:proximityUUID major:5 minor:5000 measuredPower:-58];
-//        [peripheral startAdvertising:beaconData.beaconAdvertisement];
-        
+- (void)configureAdvertisingForBeacon:(CMBeaconAdvertismentData *)beacon {
+    if (self.manager.state != CBCentralManagerStatePoweredOn) {
+        NSLog(@"Core Bluetooth is off");
+        return;
     }
+    [self.manager stopAdvertising];
+    NSLog(@"Transmitting beacon | UUID: %@ | Major: %hu | Minor: %hu | Power: %hhd",
+          beacon.proximityUUID.UUIDString, beacon.major, beacon.minor, beacon.measuredPower);
+    [self.manager startAdvertising:[beacon beaconAdvertisement]];
+}
+
+- (void)rotateAdvertising {
+    [self configureAdvertisingForBeacon:[self currentBeacon]];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2000 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+        if (!self.isBroadcasting) {
+            [self.manager stopAdvertising];
+        } else {
+            [self rotateAdvertising];
+        }
+    });
+}
+
+- (void)peripheralManagerDidUpdateState:(CBPeripheralManager *)peripheral {
+    if (peripheral.state == CBPeripheralManagerStatePoweredOn) {
+        self.manager = peripheral;
+    }
+}
+
+- (CMBeaconAdvertismentData *)currentBeacon {
+    if (currentBeacon >= self.beacons.count) {
+        currentBeacon = 0;
+    }
+    currentBeacon++;
+    return [self.beacons objectAtIndex:currentBeacon-1];
 }
 
 - (IBAction)didTapToggleButton:(id)sender {
     
     if (self.manager && !self.isBroadcasting) {
-        NSArray<CMBeaconAdvertismentData *> *beacons = [self createBeaconArray];
+        [self.beacons removeAllObjects];
+        [self.beacons addObjectsFromArray:[self createBeaconArray]];
         
-        for (int i = 0; i < [beacons count]; i++) {
-            // TODO: This only advertises the last beaconAdvertisement fed in to it.
-            //       Look in to a queue system.
-            CMBeaconAdvertismentData *beacon = [beacons objectAtIndex:i];
-            [self.manager startAdvertising:beacon.beaconAdvertisement];
-        }
         self.isBroadcasting = YES;
+        [self rotateAdvertising];
         
-        [self.statusField setStringValue:@"Broadcasting"];
-        [self.toggleButton setTitle:@"Stop broadcasting"];
+        [self.statusField setStringValue:STRING_BEACONS_ACTIVE];
+        [self.toggleButton setTitle:STRING_BUTTON_STOP];
         
         [self.uuidFieldCell setEditable:NO];
         [self.uuidFieldCell setTextColor:[NSColor lightGrayColor]];
@@ -98,10 +131,10 @@ NSString *const PREFS_KEY_POWER = @"power";
     } else if (self.manager && self.isBroadcasting) {
         
         [self.manager stopAdvertising];
-        [self.statusField setStringValue:@"Not broadcasting"];
+        [self.statusField setStringValue:STRING_BEACONS_INACTIVE];
         
         self.isBroadcasting = NO;
-        [self.toggleButton setTitle:@"Start broadcasting"];
+        [self.toggleButton setTitle:STRING_BUTTON_START];
 
         [self.uuidFieldCell setEditable:YES];
         [self.uuidFieldCell setTextColor:[NSColor blackColor]];
@@ -124,12 +157,14 @@ NSString *const PREFS_KEY_POWER = @"power";
     NSArray<NSString *> *minors = [self.minorFieldCell.stringValue componentsSeparatedByString:@","];
     NSArray<NSString *> *powers = [self.powerFieldCell.stringValue componentsSeparatedByString:@","];
 
+    NSLog(@"%lu %lu %lu %lu", uuids.count, majors.count, minors.count, powers.count);
     int numOfBeacons = [self largestValue:[NSArray arrayWithObjects:
-                                           [NSNumber numberWithUnsignedInteger:[uuids count]],
-                                           [NSNumber numberWithUnsignedInteger:[majors count]],
-                                           [NSNumber numberWithUnsignedInteger:[minors count]],
-                                           [NSNumber numberWithUnsignedInteger:[powers count]],
+                                           [NSNumber numberWithUnsignedLong:[uuids count]],
+                                           [NSNumber numberWithUnsignedLong:[majors count]],
+                                           [NSNumber numberWithUnsignedLong:[minors count]],
+                                           [NSNumber numberWithUnsignedLong:[powers count]],
                                            nil]];
+    NSLog(@"Num of beacons: %d", numOfBeacons);
 
     for (int i = 0; i < numOfBeacons; i++) {
         NSString *uuid, *major, *minor, *power;
@@ -158,7 +193,11 @@ NSString *const PREFS_KEY_POWER = @"power";
             power = [powers objectAtIndex:[powers count]-1];
         }
         // beacon record
-        CMBeaconAdvertismentData *beacon = [[CMBeaconAdvertismentData alloc] initWithProximityUUID:uuid major:[major integerValue] minor:[minor integerValue] measuredPower:[power integerValue]];
+        CMBeaconAdvertismentData *beacon = [[CMBeaconAdvertismentData alloc]
+                                            initWithProximityUUID:uuid
+                                            major:[major integerValue]
+                                            minor:[minor integerValue]
+                                            measuredPower:[power integerValue]];
         [beaconArray addObject:beacon];
     }
 
@@ -166,11 +205,12 @@ NSString *const PREFS_KEY_POWER = @"power";
 }
 
 - (int)largestValue:(NSArray<NSNumber *> *)values {
-    int highestValue = -INFINITY;
+    int highestValue = -1;
 
-    for (int i = 0; i < [values count]; i++) {
-        if ((int)[values objectAtIndex:i] > highestValue) {
-            highestValue = (int)[values objectAtIndex:i];
+    for (NSNumber *value in values) {
+        //NSLog(@"highest: %d | this one: %d", highestValue, value.intValue);
+        if (value.intValue > highestValue) {
+            highestValue = value.intValue;
         }
     }
 
